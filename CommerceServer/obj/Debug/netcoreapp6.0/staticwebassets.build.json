@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "320t2mdVx2EEBeGI6h+2fzbDJrvHdW7Dh+Eu1B1xOfc=",
+  "Source": "CommerceServer",
+  "BasePath": "_content/CommerceServer",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
