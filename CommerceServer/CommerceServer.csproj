@@ -19,7 +19,8 @@
 
     <ItemGroup>
       <Folder Include="Controllers" />
-      <Folder Include="DAL\commerce" />
+      <Folder Include="DAL" />
+      <Folder Include="Models" />
     </ItemGroup>
 
 </Project>
