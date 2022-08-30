@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 using CommerceServer.DAL;
 using CommerceServer.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Newtonsoft.Json;
 
 namespace CommerceServer.Controllers
 {
@@ -40,7 +44,8 @@ namespace CommerceServer.Controllers
         public async Task<OrderResponse> Get([FromQuery] string sortOrder = "asc", [FromQuery] int page = 1, [FromQuery] int rowsPerPage = 25)
         {
             var transactions = await GetTopTransactions(sortOrder, page, rowsPerPage);
-            return ProcessOrders(transactions, page, rowsPerPage, sortOrder);
+            var totalTransactions = await GetTransactionsCount();
+            return ProcessOrders(transactions, page, rowsPerPage, sortOrder, totalTransactions);
         }
 
         /// <summary>
@@ -51,21 +56,39 @@ namespace CommerceServer.Controllers
         /// <param name="rowsPerPage">Number of rows to return</param>
         /// <param name="sortOrder">Defines the sort for the results</param>
         /// <returns>Order response object with all properties filled</returns>
-        private OrderResponse ProcessOrders(IReadOnlyCollection<Transaction> transactions, int page, int rowsPerPage, string sortOrder)
+        private OrderResponse ProcessOrders(IReadOnlyCollection<Transaction> transactions, int page, int rowsPerPage, string sortOrder, int totalTransactions)
         {
             /* Transactions do not have an order total set in the database.
                 We need to calculate the order here. it'll be the sum of transactionLine Quantity * TransactionLine product price
                 You must use LINQ to complete this exercise. 
                 TODO: Add calculation for each transactions order total
              */
-            
+            IEnumerable<Transaction> orders = from transaction in transactions select new Transaction
+            {
+                Id = transaction.Id,
+                FirstName = transaction.FirstName,
+                LastName = transaction.LastName,
+                Email = transaction.Email,
+                Gender = transaction.Gender,
+                Address = transaction.Address,
+                PostalCode = transaction.PostalCode,
+                OrderTotal = (from line in transaction.TransactionLines select line.Quantity * line.Product.Price).Sum(),
+                TransactionLines = transaction.TransactionLines
+            };
+
             var orderResponse = new OrderResponse()
             {
-                Orders = null, //TODO: Add transactions here
-                OrderAverage = 0, //TODO: Calculate the order average
-                LeastExpensiveOrderId = 0, //TODO: Add least expensive order within the result set
-                MostExpensiveOrderId = 0, //TODO: Add most expensive order within the result set
-                TotalNumberOfOrders = 0, //TODO: Get total number of transactions (not just within result set)
+                Orders = orders, //TODO: Add transactions here
+                OrderAverage = (from transaction in orders select transaction.OrderTotal).Average(), //TODO: Calculate the order average
+                LeastExpensiveOrderId = (
+                from order in orders
+                where order.OrderTotal == orders.Min(order => order.OrderTotal) 
+                select order.Id).FirstOrDefault(), //TODO: Add least expensive order within the result set
+                MostExpensiveOrderId = (
+                from order in orders
+                where order.OrderTotal == orders.Max(order => order.OrderTotal)
+                select order.Id).FirstOrDefault(), //TODO: Add most expensive order within the result set
+                TotalNumberOfOrders = totalTransactions, //TODO: Get total number of transactions (not just within result set)
                 ResultsPerPage = rowsPerPage, //Rows per page
                 Page = page, //Current page
                 SortOrder = sortOrder //Current sort Order
@@ -89,15 +112,30 @@ namespace CommerceServer.Controllers
             {
                 case SortOrder.Ascending:
                     //TODO: Add Ascending sort logic
+                    query = from transaction in query orderby transaction.Id select transaction;
                     break;
                 case SortOrder.Descending:
                     //TODO: Add Descending sort logic
+                    query = from transaction in query orderby transaction.Id descending select transaction;
                     break;
                 default:
                     throw new InvalidEnumArgumentException("Invalid sort order");
             }
             //TODO: Add your code here to implement the pagination
-            return await Task.FromResult(new List<Transaction>());
+            List<Transaction> transactionPage =  query.Skip(rowsPerPage * (page - 1)).Take(rowsPerPage).ToList();
+            return await Task.FromResult(transactionPage);
+        }
+
+        /// <summary>
+        /// Gets total number of transactions from the database
+        /// </summary>
+        private async Task<int> GetTransactionsCount()
+        {
+            //This query will call the database and return transactions while including the Product on the Transaction
+            var query = _context.Customer.Include("TransactionLines.Product"); //Don't change this line
+                                                                               //Get Transaction Count
+            int transactionPageCount = (from transaction in query select transaction).Count();
+            return await Task.FromResult(transactionPageCount);
         }
     }
 }
