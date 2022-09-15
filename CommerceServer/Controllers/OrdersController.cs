@@ -58,14 +58,35 @@ namespace CommerceServer.Controllers
                 You must use LINQ to complete this exercise. 
                 TODO: Add calculation for each transactions order total
              */
+            var query = _context.Customer.Include("TransactionLines.Product"); //Don't change this line
+            var trs = transactions.Select(t => { t.OrderTotal = t.TransactionLines.Select(tl => tl.Quantity * tl.Product.Price).Sum(); return t; });
+            int leastExpensiveOrderId, mostExpensiveOrderId;
+            decimal orderAverage;
+            if (transactions.Count() == 0)
+            {
+
+                orderAverage = 0;
+                leastExpensiveOrderId = 0;
+                mostExpensiveOrderId = 0;
+            }
+            else
+            {
+                orderAverage = Math.Round((from t in trs select t.OrderTotal).ToList().Average(), 2);
+                leastExpensiveOrderId = (from t in trs orderby t.OrderTotal select t.Id).ToArray()[0];
+                mostExpensiveOrderId = (from t in trs orderby t.OrderTotal descending select t.Id).ToArray()[0];
+
+            }
             
+
             var orderResponse = new OrderResponse()
             {
-                Orders = null, //TODO: Add transactions here
-                OrderAverage = 0, //TODO: Calculate the order average
-                LeastExpensiveOrderId = 0, //TODO: Add least expensive order within the result set
-                MostExpensiveOrderId = 0, //TODO: Add most expensive order within the result set
-                TotalNumberOfOrders = 0, //TODO: Get total number of transactions (not just within result set)
+
+                Orders = trs, //TODO: Add transactions here
+                OrderAverage = orderAverage, //TODO: Calculate the order average
+                LeastExpensiveOrderId = leastExpensiveOrderId, //TODO: Add least expensive order within the result set
+                MostExpensiveOrderId = mostExpensiveOrderId, //TODO: Add most expensive order within the result set
+                //TotalNumberOfOrders = trs.Count(), //TODO: Get total number of transactions (not just within result set)
+                TotalNumberOfOrders = query.Count(), //TODO: Get total number of transactions (not just within result set)
                 ResultsPerPage = rowsPerPage, //Rows per page
                 Page = page, //Current page
                 SortOrder = sortOrder //Current sort Order
@@ -84,20 +105,25 @@ namespace CommerceServer.Controllers
         {
             //This query will call the database and return transactions while including the Product on the Transaction
             var query = _context.Customer.Include("TransactionLines.Product"); //Don't change this line
+            List<Transaction> transactions = new List<Transaction>();
             /* Add your code below to implement the sort order */
             switch (sortOrder)
             {
                 case SortOrder.Ascending:
                     //TODO: Add Ascending sort logic
+                    transactions = (from t in query orderby t.Id select t).Skip((page - 1) * rowsPerPage).Take(rowsPerPage).ToList();
+                    //transactions = (from t in query where t.OrderTotal != 0 select t).Skip((page - 1) * rowsPerPage).Take(rowsPerPage).ToList();
                     break;
                 case SortOrder.Descending:
                     //TODO: Add Descending sort logic
+                    transactions = (from t in query orderby t.Id descending select t).Skip((page - 1) * rowsPerPage).Take(rowsPerPage).ToList();
                     break;
                 default:
                     throw new InvalidEnumArgumentException("Invalid sort order");
             }
             //TODO: Add your code here to implement the pagination
-            return await Task.FromResult(new List<Transaction>());
+
+            return await Task.FromResult(transactions);
         }
     }
 }
